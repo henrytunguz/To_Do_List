@@ -37,54 +37,82 @@ impl Task {
         println!("Completed: {}", tsk.completed);
     }
 }
-
-fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
-    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = l - c / 2.0;
-
-    let (r, g, b) = match (h % 360.0) as u32 {
-        0..=59 => (c, x, 0.0),
-        60..=119 => (x, c, 0.0),
-        120..=179 => (0.0, c, x),
-        180..=239 => (0.0, x, c),
-        240..=299 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    [
-        ((r + m) * 255.0) as u8,
-        ((g + m) * 255.0) as u8,
-        ((b + m) * 255.0) as u8,
-    ]
+//
+// fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
+//     let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+//     let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+//     let m = l - c / 2.0;
+//
+//     let (r, g, b) = match (h % 360.0) as u32 {
+//         0..=59 => (c, x, 0.0),
+//         60..=119 => (x, c, 0.0),
+//         120..=179 => (0.0, c, x),
+//         180..=239 => (0.0, x, c),
+//         240..=299 => (x, 0.0, c),
+//         _ => (c, 0.0, x),
+//     };
+//
+//     [
+//         ((r + m) * 255.0) as u8,
+//         ((g + m) * 255.0) as u8,
+//         ((b + m) * 255.0) as u8,
+//     ]
+// }
+//
+// fn main() {
+//     println!("Hello, world!");
+//     let now = Local::now();
+//     let tsk = Task::new(
+//         "homework",
+//         "do math pages 1-11",
+//         [150.0, 250.0, 200.0],
+//         [2024, 2, 3],
+//         [13, 30, 0],
+//         false,
+//     );
+//     let task1: Task;
+//     let date = now.date_naive();
+//     let dateList: [u32; 3];
+//     dateList = [now.year() as u32, now.month(), now.day()];
+//     let timeList: [u32; 3];
+//     timeList = [now.hour(), now.minute(), now.second()];
+//     task1 = Task::new(
+//         "today",
+//         "how are you",
+//         [10.0, 101.0, 10.0],
+//         dateList,
+//         timeList,
+//         false,
+//     );
+//
+//     Task::printInfo(tsk);
+//     Task::printInfo(task1);
+// }
+fn printTasks(tasks: Vec<Task>) {
+    for task in tasks {
+        Task::printInfo(task);
+    }
 }
-
 fn main() {
-    println!("Hello, world!");
-    let now = Local::now();
-    let tsk = Task::new(
-        "homework",
-        "do math pages 1-11",
-        [150.0, 250.0, 200.0],
-        [2024, 2, 3],
-        [13, 30, 0],
+    let mut v = Vec::new();
+    let mut tempTaskSaver: Task;
+    tempTaskSaver=Task::new(
+        "newTitle",
+        "newDetails",
+        [0.0,0.0,0.0],
+        [2025,3,6],
+        [13,59,00],
         false,
     );
-    let task1: Task;
-    let date = now.date_naive();
-    let dateList: [u32; 3];
-    dateList = [now.year() as u32, now.month(), now.day()];
-    let timeList: [u32; 3];
-    timeList = [now.hour(), now.minute(), now.second()];
-    task1 = Task::new(
-        "today",
-        "how are you",
-        [10.0, 101.0, 10.0],
-        dateList,
-        timeList,
+    v.push(tempTaskSaver);
+    tempTaskSaver=Task::new(
+        "oldTitle",
+        "oldDetails",
+        [0.0,0.0,0.0],
+        [2024,3,6],
+        [13,58,00],
         false,
     );
-
-    Task::printInfo(tsk);
-    Task::printInfo(task1);
+    v.push(tempTaskSaver);
+    printTasks(v)
 }
