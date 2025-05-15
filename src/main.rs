@@ -7,7 +7,7 @@ use egui_extras::DatePickerButton;
 struct Task {
     title: String,
     details: String,
-    color: [f32; 3],
+    color: egui::Color32,
     date: NaiveDate,
     time: NaiveTime,
     completed: bool,
@@ -17,17 +17,17 @@ impl Task {
     fn new(
         title: &str,
         details: &str,
-        color: [f32; 3],
-        date: [u32; 3],
-        time: [u32; 3],
+        color: egui::Color32,
+        date: NaiveDate,
+        time: NaiveTime,
         completed: bool,
     ) -> Self {
         Task {
             title: title.to_string(),
             details: details.to_string(),
-            color: color,
-            date: NaiveDate::from_ymd_opt(date[0] as i32, date[1], date[2]).unwrap(),
-            time: NaiveTime::from_hms_opt(time[0], time[1], time[2]).unwrap(),
+            color,
+            date,
+            time,
 
             completed: false,
         }
@@ -163,26 +163,7 @@ impl TaskList {
             .collect()
     }
 }
-fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
-    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = l - c / 2.0;
 
-    let (r, g, b) = match (h % 360.0) as u32 {
-        0..=59 => (c, x, 0.0),
-        60..=119 => (x, c, 0.0),
-        120..=179 => (0.0, c, x),
-        180..=239 => (0.0, x, c),
-        240..=299 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    [
-        ((r + m) * 255.0) as u8,
-        ((g + m) * 255.0) as u8,
-        ((b + m) * 255.0) as u8,
-    ]
-}
 pub struct MyApp {
     pub task_list: TaskList,
     username: String,
@@ -207,15 +188,21 @@ impl Default for MyApp {
             show_add_task_window: false,
         }
     }
+
 }
-fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
+impl MyApp {
+    fn reset_temporary(&mut self) {
+        self.temp_task_title = String::new();
+        self.temp_task_details = String::new();
+        self.temp_task_time = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+        self.temp_task_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        self.show_add_task_window = false;
+    }
+}
+fn TaskRectMake(ui: &mut egui::Ui, mut task: &mut Task) {
     // Create a frame with some padding
     let frame = egui::Frame::none()
-        .fill(egui::Color32::from_rgb(
-            (task.color[0] * 255.0) as u8,
-            (task.color[1] * 255.0) as u8,
-            (task.color[2] * 255.0) as u8,
-        ))
+        .fill(task.color)
         .stroke(egui::Stroke::new(1.0, egui::Color32::BLACK))
         .rounding(8.0);
         // .inner_margin(egui::style::Margin::same(10.0));
@@ -241,8 +228,19 @@ fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
             } else {
                 egui::Color32::YELLOW
             };
+            if task.completed {
+                if ui.button("Uncomplete").clicked() {
+                    task.completed = false;
+                }
 
+            }
+            if  !task.completed{
+                if ui.button("Complete").clicked() {
+                    task.completed = true;
+                }
+            }
             ui.colored_label(status_color, status_text);
+
         });
     });
 
@@ -261,7 +259,23 @@ impl eframe::App for MyApp {
                 ui.text_edit_multiline(&mut self.temp_task_details);
                 ui.separator();
                 DatePickerButton::new(&mut self.temp_task_date);
+                ui.horizontal(|ui| {
+                    ui.label("Time:");
+                    ui.add(egui::DragValue::new(&mut self.temp_task_time.hour()).range(0..=23).speed(0.1).suffix(" h"));
+                    ui.add(egui::DragValue::new(&mut self.temp_task_time.minute()).range(0..=59).speed(0.1).suffix(" min"));
+                });
+                ui.vertical(|ui| {
+                    if ui.button("Confirm").clicked() {
+                         let task=Task::new(&self.temp_task_title,&self.temp_task_details,self.color,self.temp_task_date,self.temp_task_time,false);
 
+                        self.task_list.add_task(task);
+                        self.reset_temporary();
+                    }
+                    else if ui.button("Cancel").clicked() {
+                        // Handle cancel action here
+                        self.reset_temporary();
+                    }
+                });
             });
         }
         egui::SidePanel::left("side_panel_left")
@@ -289,8 +303,8 @@ impl eframe::App for MyApp {
             ui.heading("Tasks");
 
             // Get upcoming and overdue tasks
-            let upcoming_tasks = self.task_list.get_upcoming_tasks();
-            let overdue_tasks = self.task_list.get_overdue_tasks();
+            let mut upcoming_tasks = self.task_list.get_upcoming_tasks();
+            let mut overdue_tasks = self.task_list.get_overdue_tasks();
 
             egui::SidePanel::left("SoonTasks").default_width(300.0).show_inside(ui, |ui| {
                 ui.heading("Soon");
@@ -299,8 +313,9 @@ impl eframe::App for MyApp {
                     ui.label("No upcoming tasks");
                 } else {
                     // Display upcoming tasks
-                    for task in upcoming_tasks {
-                        TaskRectMake(ui, task);
+                    for task in upcoming_tasks.iter_mut() {
+                        if !task.completed {
+                            TaskRectMake(ui, task);}
                     }
                 }
             });
@@ -312,8 +327,9 @@ impl eframe::App for MyApp {
                     ui.label("No overdue tasks");
                 } else {
                     // Display overdue tasks
-                    for task in overdue_tasks {
-                        TaskRectMake(ui, task);
+                    for task in overdue_tasks.iter_mut() {
+                        if !task.completed {
+                        TaskRectMake(ui, task);}
                     }
                 }
             });
@@ -328,25 +344,25 @@ fn main() -> eframe::Result {
 
     // Create and initialize your app
     let mut app = MyApp::default();
-    let task = Task::new(
-        "homework",
-        "do math pages 1-11",
-        [150.0, 250.0, 200.0],
-        [2024, 2, 3],
-        [13, 30, 0],
-        false,
-    );
-    app.task_list.add_task(task);
-    let now=Local::now();
-    let future_task = Task::new(
-        "Project Presentation",
-        "Prepare slides for the team meeting",
-        [100.0, 180.0, 250.0], // Different color (blue-ish)
-        [now.year() as u32, now.month(), now.day() + 7], // One week from today
-        [15, 0, 0], // 3:00 PM
-        false,
-    );
-    app.task_list.add_task(future_task);
+    // let task = Task::new(
+    //     "homework",
+    //     "do math pages 1-11",
+    //     [150.0, 250.0, 200.0],
+    //     [2024, 2, 3],
+    //     [13, 30, 0],
+    //     false,
+    // );
+    // app.task_list.add_task(task);
+    // // let now=Local::now();
+    // // let future_task = Task::new(
+    // //     "Project Presentation",
+    // //     "Prepare slides for the team meeting",
+    // //     [100.0, 180.0, 250.0], // Different color (blue-ish)
+    // //     [now.year() as u32, now.month(), now.day() + 7], // One week from today
+    // //     [15, 0, 0], // 3:00 PM
+    // //     false,
+    // // );
+    // app.task_list.add_task(future_task);
     eframe::run_native(
         "NOTIF APP",
         options,
