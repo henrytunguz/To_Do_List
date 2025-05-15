@@ -2,6 +2,7 @@ use chrono::{Datelike, Local, NaiveDate, NaiveTime, Timelike};
 use eframe::{egui, epaint};
 use egui_extras;
 use egui::{containers::panel, Ui};
+use egui_extras::DatePickerButton;
 #[derive(Clone)]
 struct Task {
     title: String,
@@ -55,7 +56,8 @@ impl TaskList {
     }
     fn add_and_sort(&mut self, task: Task) {
         self.list.push(task);
-        self.sort_by_datetime()
+        self.sort_by_status_and_magnitude()
+
     }
 
     fn add_task(&mut self, task: Task) {
@@ -121,6 +123,45 @@ impl TaskList {
             task.printInfo();
         }
     }
+
+    // Helper method to get overdue and upcoming tasks
+    fn get_overdue_tasks(&self) -> Vec<&Task> {
+        let now = Local::now();
+        let current_date = NaiveDate::from_ymd_opt(
+            now.year(),
+            now.month(),
+            now.day()
+        ).unwrap();
+        let current_time = NaiveTime::from_hms_opt(
+            now.hour(),
+            now.minute(),
+            now.second()
+        ).unwrap();
+        let current_datetime = (current_date, current_time);
+
+        self.list.iter()
+            .filter(|task| (task.date, task.time) < current_datetime)
+            .collect()
+    }
+
+    fn get_upcoming_tasks(&self) -> Vec<&Task> {
+        let now = Local::now();
+        let current_date = NaiveDate::from_ymd_opt(
+            now.year(),
+            now.month(),
+            now.day()
+        ).unwrap();
+        let current_time = NaiveTime::from_hms_opt(
+            now.hour(),
+            now.minute(),
+            now.second()
+        ).unwrap();
+        let current_datetime = (current_date, current_time);
+
+        self.list.iter()
+            .filter(|task| (task.date, task.time) >= current_datetime)
+            .collect()
+    }
 }
 fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
     let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
@@ -146,6 +187,11 @@ pub struct MyApp {
     pub task_list: TaskList,
     username: String,
     color: egui::Color32,
+    pub temp_task_title: String,
+    pub temp_task_details: String,
+    pub temp_task_time: NaiveTime,
+    pub temp_task_date: NaiveDate,
+    pub show_add_task_window: bool,
 
 }
 impl Default for MyApp {
@@ -154,6 +200,11 @@ impl Default for MyApp {
             task_list: TaskList::new(Vec::new()),
             username: "".to_string(),
             color: egui::Color32::LIGHT_BLUE,
+            temp_task_title: "".to_string(),
+            temp_task_details: "".to_string(),
+            temp_task_time: NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+            temp_task_date: NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
+            show_add_task_window: false,
         }
     }
 }
@@ -161,15 +212,16 @@ fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
     // Create a frame with some padding
     let frame = egui::Frame::none()
         .fill(egui::Color32::from_rgb(
-            (task.color[0]) as u8,
-            (task.color[1]) as u8,
-            (task.color[2]) as u8,
+            (task.color[0] * 255.0) as u8,
+            (task.color[1] * 255.0) as u8,
+            (task.color[2] * 255.0) as u8,
         ))
         .stroke(egui::Stroke::new(1.0, egui::Color32::BLACK))
         .rounding(8.0);
+        // .inner_margin(egui::style::Margin::same(10.0));
 
-
-    frame.show(ui, |ui| {        ui.vertical_centered(|ui| {
+    frame.show(ui, |ui| {
+        ui.vertical(|ui| {
             // Display task title in bold
             ui.heading(&task.title);
 
@@ -196,7 +248,79 @@ fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
 
     // Add some space after each task
     ui.add_space(8.0);
-}fn main() -> eframe::Result {
+}
+
+// Now modify the eframe::App implementation to use these methods
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Sort tasks before displaying
+        self.task_list.sort_by_status_and_magnitude();
+        if self.show_add_task_window {
+            egui::Window::new("Add Task").resizable(true).show(ctx, |ui| {
+                ui.text_edit_singleline(&mut self.temp_task_title);
+                ui.text_edit_multiline(&mut self.temp_task_details);
+                ui.separator();
+                DatePickerButton::new(&mut self.temp_task_date);
+
+            });
+        }
+        egui::SidePanel::left("side_panel_left")
+            .frame(egui::Frame::default().fill(self.color))
+            .show(ctx, |ui| {
+                ui.heading("");
+                if ui.button("Add Task").clicked() {
+                    self.show_add_task_window = true;
+                }
+            });
+
+        egui::SidePanel::right("side_panel_right")
+            .frame(egui::Frame::default().fill(self.color))
+            .show(ctx, |ui| {
+                ui.heading("");
+            });
+
+        egui::TopBottomPanel::top("top_panel")
+            .frame(egui::Frame::default().fill(self.color))
+            .show(ctx, |ui| {
+                ui.heading("NOTIF APP");
+            });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Tasks");
+
+            // Get upcoming and overdue tasks
+            let upcoming_tasks = self.task_list.get_upcoming_tasks();
+            let overdue_tasks = self.task_list.get_overdue_tasks();
+
+            egui::SidePanel::left("SoonTasks").default_width(300.0).show_inside(ui, |ui| {
+                ui.heading("Soon");
+
+                if upcoming_tasks.is_empty() {
+                    ui.label("No upcoming tasks");
+                } else {
+                    // Display upcoming tasks
+                    for task in upcoming_tasks {
+                        TaskRectMake(ui, task);
+                    }
+                }
+            });
+
+            egui::SidePanel::right("TooLateTasks").default_width(300.0).show_inside(ui, |ui| {
+                ui.heading("Late");
+
+                if overdue_tasks.is_empty() {
+                    ui.label("No overdue tasks");
+                } else {
+                    // Display overdue tasks
+                    for task in overdue_tasks {
+                        TaskRectMake(ui, task);
+                    }
+                }
+            });
+        });
+    }
+}
+fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 800.0]),
         ..Default::default()
@@ -213,7 +337,16 @@ fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
         false,
     );
     app.task_list.add_task(task);
-
+    let now=Local::now();
+    let future_task = Task::new(
+        "Project Presentation",
+        "Prepare slides for the team meeting",
+        [100.0, 180.0, 250.0], // Different color (blue-ish)
+        [now.year() as u32, now.month(), now.day() + 7], // One week from today
+        [15, 0, 0], // 3:00 PM
+        false,
+    );
+    app.task_list.add_task(future_task);
     eframe::run_native(
         "NOTIF APP",
         options,
@@ -223,45 +356,3 @@ fn TaskRectMake(ui: &mut egui::Ui, task: &Task) {
             Ok(Box::new(app))
         }),
     )}
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // In your update method or wherever you prepare data for display
-        self.task_list.sort_by_status_and_magnitude();
-
-        egui::SidePanel::left("side_panel_left")
-            .frame(egui::Frame::default().fill(self.color))
-            .show(ctx, |ui|
-             {
-                ui.heading("");
-            });
-        egui::SidePanel::right("side_panel_right")
-            .frame(egui::Frame::default().fill(self.color))
-            .show(ctx, |ui|
-                {
-                    ui.heading("");
-                });
-        egui::TopBottomPanel::top("top_panel")
-            .frame(egui::Frame::default().fill(self.color))
-            .show(ctx, |ui|
-                {
-                    ui.heading("NOTIF APP" );
-                });
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Tasks");
-            egui::SidePanel::left("SoonTasks").default_width(300.0).show_inside(ui, |ui| {
-                ui.heading("Soon");
-                // if let Some(task) = self.task_list.list.get(0) {
-                //     ui.label(&task.title);
-                // }
-                for task in &self.task_list.list {
-                    TaskRectMake(ui, task);
-                }
-
-            });
-            egui::SidePanel::right("TooLateTasks").default_width(300.0).show_inside(ui, |ui| {
-                ui.heading("Late");
-                ui.label("LATE!");
-            });
-        });
-    }
-}
