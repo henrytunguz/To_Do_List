@@ -125,7 +125,7 @@ impl TaskList {
     }
 
     // Helper method to get overdue and upcoming tasks
-    fn get_overdue_tasks(&self) -> Vec<&Task> {
+    fn get_overdue_tasks(&mut self) -> Vec<&mut Task> {
         let now = Local::now();
         let current_date = NaiveDate::from_ymd_opt(
             now.year(),
@@ -139,12 +139,12 @@ impl TaskList {
         ).unwrap();
         let current_datetime = (current_date, current_time);
 
-        self.list.iter()
+        self.list.iter_mut()
             .filter(|task| (task.date, task.time) < current_datetime)
             .collect()
     }
 
-    fn get_upcoming_tasks(&self) -> Vec<&Task> {
+    fn get_upcoming_tasks(&mut self) -> Vec<&mut Task> {
         let now = Local::now();
         let current_date = NaiveDate::from_ymd_opt(
             now.year(),
@@ -158,7 +158,7 @@ impl TaskList {
         ).unwrap();
         let current_datetime = (current_date, current_time);
 
-        self.list.iter()
+        self.list.iter_mut()
             .filter(|task| (task.date, task.time) >= current_datetime)
             .collect()
     }
@@ -259,10 +259,13 @@ impl eframe::App for MyApp {
                 ui.text_edit_multiline(&mut self.temp_task_details);
                 ui.separator();
                 DatePickerButton::new(&mut self.temp_task_date);
+                ui.heading("Time:");
                 ui.horizontal(|ui| {
-                    ui.label("Time:");
-                    ui.add(egui::DragValue::new(&mut self.temp_task_time.hour()).range(0..=23).speed(0.1).suffix(" h"));
-                    ui.add(egui::DragValue::new(&mut self.temp_task_time.minute()).range(0..=59).speed(0.1).suffix(" min"));
+                    ui.label("hour");
+                    ui.add(egui::Slider::new(&mut self.temp_task_time.hour(),0..=23).suffix(" h"));
+                    ui.separator();
+                    ui.label("minute");
+;                    ui.add(egui::Slider::new(&mut self.temp_task_time.minute(),0..=59).suffix(" min"));
                 });
                 ui.vertical(|ui| {
                     if ui.button("Confirm").clicked() {
@@ -315,7 +318,7 @@ impl eframe::App for MyApp {
                     // Display upcoming tasks
                     for task in upcoming_tasks.iter_mut() {
                         if !task.completed {
-                            TaskRectMake(ui, task);}
+                            TaskRectMake(ui,  task);}
                     }
                 }
             });
