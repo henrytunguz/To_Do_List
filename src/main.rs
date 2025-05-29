@@ -3,14 +3,85 @@ use eframe::{egui, epaint};
 use egui_extras;
 use egui::{containers::panel, Ui};
 use egui_extras::DatePickerButton;
-#[derive(Clone)]
+use serde::{Serialize, Deserialize};
+use std::fs::File;
+use std::io::Write;
+use std::fs;
+
+#[derive(Clone, Serialize, Deserialize)]
 struct Task {
     title: String,
     details: String,
+    #[serde(with = "color32_def")]
     color: egui::Color32,
+    #[serde(with = "naive_date_def")]
     date: NaiveDate,
+    #[serde(with = "naive_time_def")]
     time: NaiveTime,
     completed: bool,
+}
+mod naive_date_def {
+    use chrono::NaiveDate;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(date: &NaiveDate, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&date.format("%Y-%m-%d").to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(serde::de::Error::custom)
+    }
+}
+
+// For NaiveTime
+mod naive_time_def {
+    use chrono::NaiveTime;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(time: &NaiveTime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&time.format("%H:%M:%S").to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        NaiveTime::parse_from_str(&s, "%H:%M:%S").map_err(serde::de::Error::custom)
+    }
+}
+// Helper module for Color32 serialization as u32
+mod color32_def {
+    use serde::{Deserializer, Serializer, Deserialize};
+    use eframe::egui::Color32;
+
+    pub fn serialize<S>(color: &Color32, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer {
+        // Convert RGBA to u32: (A << 24) | (B << 16) | (G << 8) | R
+        let [r, g, b, a] = color.to_array();
+        let value = (a as u32) << 24 | (b as u32) << 16 | (g as u32) << 8 | (r as u32);
+        serializer.serialize_u32(value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Color32, D::Error>
+    where D: Deserializer<'de> {
+        let value = u32::deserialize(deserializer)?;
+        let r = (value & 0xFF) as u8;
+        let g = ((value >> 8) & 0xFF) as u8;
+        let b = ((value >> 16) & 0xFF) as u8;
+        let a = ((value >> 24) & 0xFF) as u8;
+        Ok(Color32::from_rgba_premultiplied(r, g, b, a))
+    }
 }
 
 impl Task {
@@ -162,6 +233,20 @@ impl TaskList {
             .filter(|task| (task.date, task.time) >= current_datetime)
             .collect()
     }
+    fn save_to_file(&self, path: &str) {
+        let data = serde_json::to_string(&self.list).unwrap();
+        let mut file = File::create(path).unwrap();
+        file.write_all(data.as_bytes()).unwrap();
+    }
+    fn load_from_file(path: &str) -> Self {
+        let data = fs::read_to_string(path).unwrap_or("[]".to_string());
+        if data.is_empty() {
+            return TaskList::new(Vec::new());}
+        else {
+            let tasks: Vec<Task> = serde_json::from_str(&data).unwrap();
+            return TaskList::new(tasks);
+        }
+    }
 }
 
 pub struct MyApp {
@@ -181,7 +266,7 @@ pub struct MyApp {
 impl Default for MyApp {
     fn default() -> Self {
         Self {
-            task_list: TaskList::new(Vec::new()),
+            task_list:TaskList::load_from_file("tasks.json"),
             username: "".to_string(),
             color: egui::Color32::LIGHT_BLUE,
             temp_task_title: "".to_string(),
@@ -241,6 +326,7 @@ fn TaskRectMake(ui: &mut egui::Ui, mut task: &mut Task) {
             if task.completed {
                 if ui.button("Uncomplete").clicked() {
                     task.completed = false;
+
                 }
 
             }
@@ -262,6 +348,7 @@ fn TaskRectMake(ui: &mut egui::Ui, mut task: &mut Task) {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Sort tasks before displaying
+
         self.task_list.sort_by_status_and_magnitude();
         if self.show_add_task_window {
             egui::Window::new("Add Task").resizable(true).show(ctx, |ui| {
@@ -290,6 +377,7 @@ impl eframe::App for MyApp {
                          let task=Task::new(&self.temp_task_title,&self.temp_task_details,self.color,self.temp_task_date,self.temp_task_time,false);
 
                         self.task_list.add_task(task);
+                        self.task_list.save_to_file("tasks.json");
                         self.reset_temporary();
                     }
                     else if ui.button("Cancel").clicked() {
