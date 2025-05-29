@@ -258,10 +258,17 @@ impl eframe::App for MyApp {
         self.task_list.sort_by_status_and_magnitude();
         if self.show_add_task_window {
             egui::Window::new("Add Task").resizable(true).show(ctx, |ui| {
+                ui.heading("Add New Task");
+                ui.separator();
+                ui.label("Title:");
                 ui.text_edit_singleline(&mut self.temp_task_title);
+                ui.separator();
+                ui.label("Details:");
                 ui.text_edit_multiline(&mut self.temp_task_details);
                 ui.separator();
-                DatePickerButton::new(&mut self.temp_task_date);
+                ui.label("Date:");
+                ui.add(DatePickerButton::new(&mut self.temp_task_date));
+                ui.separator();
                 ui.heading("Time:");
                 ui.horizontal(|ui| {
                     ui.label("hour");
