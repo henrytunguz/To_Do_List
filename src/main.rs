@@ -346,9 +346,10 @@ fn TaskRectMake(ui: &mut egui::Ui, mut task: &mut Task) {
 
 // Now modify the eframe::App implementation to use these methods
 impl eframe::App for MyApp {
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Sort tasks before displaying
-
+        self.task_list.save_to_file("tasks.json");
         self.task_list.sort_by_status_and_magnitude();
         if self.show_add_task_window {
             egui::Window::new("Add Task").resizable(true).show(ctx, |ui| {
@@ -472,25 +473,7 @@ fn main() -> eframe::Result {
 
     // Create and initialize your app
     let mut app = MyApp::default();
-    // let task = Task::new(
-    //     "homework",
-    //     "do math pages 1-11",
-    //     [150.0, 250.0, 200.0],
-    //     [2024, 2, 3],
-    //     [13, 30, 0],
-    //     false,
-    // );
-    // app.task_list.add_task(task);
-    // // let now=Local::now();
-    // // let future_task = Task::new(
-    // //     "Project Presentation",
-    // //     "Prepare slides for the team meeting",
-    // //     [100.0, 180.0, 250.0], // Different color (blue-ish)
-    // //     [now.year() as u32, now.month(), now.day() + 7], // One week from today
-    // //     [15, 0, 0], // 3:00 PM
-    // //     false,
-    // // );
-    // app.task_list.add_task(future_task);
+
     eframe::run_native(
         "NOTIF APP",
         options,
