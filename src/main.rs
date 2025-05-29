@@ -174,6 +174,8 @@ pub struct MyApp {
     pub temp_task_date: NaiveDate,
     pub show_add_task_window: bool,
     pub show_completed_tasks: bool,
+    pub temp_task_hour: u32,
+    pub temp_task_minute: u32,
 
 }
 impl Default for MyApp {
@@ -188,6 +190,8 @@ impl Default for MyApp {
             temp_task_date: NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
             show_add_task_window: false,
             show_completed_tasks: false,
+            temp_task_hour: 0,
+            temp_task_minute: 0,
         }
     }
 
@@ -199,6 +203,9 @@ impl MyApp {
         self.temp_task_time = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
         self.temp_task_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
         self.show_add_task_window = false;
+        self.temp_task_hour= 0;
+        self.temp_task_minute= 0;
+
 
     }
 }
@@ -272,13 +279,14 @@ impl eframe::App for MyApp {
                 ui.heading("Time:");
                 ui.horizontal(|ui| {
                     ui.label("hour");
-                    ui.add(egui::Slider::new(&mut self.temp_task_time.hour(),0..=23).suffix(" h"));
+                    ui.add(egui::Slider::new(&mut self.temp_task_hour,0..=23).suffix(" h"));
                     ui.separator();
                     ui.label("minute");
-;                    ui.add(egui::Slider::new(&mut self.temp_task_time.minute(),0..=59).suffix(" min"));
+;                    ui.add(egui::Slider::new(&mut self.temp_task_minute,0..=59).suffix(" min"));
                 });
                 ui.vertical(|ui| {
                     if ui.button("Confirm").clicked() {
+                        self.temp_task_time = NaiveTime::from_hms_opt(self.temp_task_hour, self.temp_task_minute, 0).unwrap();
                          let task=Task::new(&self.temp_task_title,&self.temp_task_details,self.color,self.temp_task_date,self.temp_task_time,false);
 
                         self.task_list.add_task(task);
@@ -309,7 +317,7 @@ impl eframe::App for MyApp {
                 if ui.button("Add Task").clicked() {
                     self.show_add_task_window = true;
                 }
-                if ui.button("Show All Tasks").clicked() {
+                if ui.button("Show Completed Tasks").clicked() {
                     self.show_completed_tasks = true;
                 }
             });
