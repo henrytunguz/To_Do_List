@@ -173,6 +173,7 @@ pub struct MyApp {
     pub temp_task_time: NaiveTime,
     pub temp_task_date: NaiveDate,
     pub show_add_task_window: bool,
+    pub show_completed_tasks: bool,
 
 }
 impl Default for MyApp {
@@ -186,6 +187,7 @@ impl Default for MyApp {
             temp_task_time: NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
             temp_task_date: NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
             show_add_task_window: false,
+            show_completed_tasks: false,
         }
     }
 
@@ -197,6 +199,7 @@ impl MyApp {
         self.temp_task_time = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
         self.temp_task_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
         self.show_add_task_window = false;
+
     }
 }
 fn TaskRectMake(ui: &mut egui::Ui, mut task: &mut Task) {
@@ -281,12 +284,26 @@ impl eframe::App for MyApp {
                 });
             });
         }
+        if self.show_completed_tasks {
+            egui::Window::new("Completed Tasks").resizable(true).show(ctx, |ui| {
+                for task in &mut self.task_list.list {
+                    if task.completed {
+                        TaskRectMake(ui, task);
+                    }
+                }
+                if ui.button("Exit").clicked() {
+                    self.show_completed_tasks = false;
+                }
+            });}
         egui::SidePanel::left("side_panel_left")
             .frame(egui::Frame::default().fill(self.color))
             .show(ctx, |ui| {
                 ui.heading("");
                 if ui.button("Add Task").clicked() {
                     self.show_add_task_window = true;
+                }
+                if ui.button("Show All Tasks").clicked() {
+                    self.show_completed_tasks = true;
                 }
             });
 
@@ -306,8 +323,13 @@ impl eframe::App for MyApp {
             ui.heading("Tasks");
 
             // Get upcoming and overdue tasks
-            let mut upcoming_tasks = self.task_list.get_upcoming_tasks();
-            let mut overdue_tasks = self.task_list.get_overdue_tasks();
+            let now = Local::now();
+            let current_date = NaiveDate::from_ymd_opt(now.year(), now.month(), now.day()).unwrap();
+            let current_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), now.second()).unwrap();
+            let current_datetime = (current_date, current_time);
+
+            let (mut overdue_tasks, mut upcoming_tasks): (Vec<_>, Vec<_>) =
+                self.task_list.list.iter_mut().partition(|task| (task.date, task.time) < current_datetime);
 
             egui::SidePanel::left("SoonTasks").default_width(300.0).show_inside(ui, |ui| {
                 ui.heading("Soon");
